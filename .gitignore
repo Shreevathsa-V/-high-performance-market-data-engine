@@ -1,0 +1,37 @@
+# CMake build directory and generated executables
+/build/
+
+# Compiled objects and libraries
+*.o
+*.a
+*.so
+*.dylib
+*.out
+
+# macOS debug symbols and operating-system files
+*.dSYM/
+.DS_Store
+
+# Profiling output
+*.profraw
+*.profdata
+*.gcda
+*.gcno
+profile_*.txt
+
+# Generated logs and benchmark results
+*.log
+benchmark_results/
+
+# Temporary and backup files
+*.tmp
+*.bak
+*.backup
+*.before_recv_tuning
+
+# Editor configuration
+.vscode/
+.idea/
+
+# Local archives and source backups
+archive/
