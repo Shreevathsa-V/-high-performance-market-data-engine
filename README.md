@@ -2,141 +2,140 @@
 
 A C++20 systems-programming project implementing a limit order book, matching engine, binary market-data protocol decoder, TCP stream processor, and Linux `epoll`-based networking.
 
-The project explores price-time priority, order lifecycle management, performance-oriented data structures, binary message processing, and event-driven networking concepts relevant to quantitative trading infrastructure and high-performance backend engineering.
+The project focuses on correctness, low-level systems concepts, performance measurement, and clear separation between the matching engine and network-facing components. It is an educational engineering project—not a production trading system.
 
-> **Status:** The CMake build succeeds and all 8 registered CTest suites pass in the current development environment.
->
-> **Scope:** This is an educational systems-programming project, not a production-ready exchange or trading system.
+## Table of Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Technology Stack](#technology-stack)
+- [Project Structure](#project-structure)
+- [Requirements](#requirements)
+- [Build](#build)
+- [Run the Tests](#run-the-tests)
+- [Run the TCP Server](#run-the-tcp-server)
+- [TCP Integration Test](#tcp-integration-test)
+- [Benchmarks](#benchmarks)
+- [Correctness and Performance Notes](#correctness-and-performance-notes)
+- [Limitations](#limitations)
+- [Future Improvements](#future-improvements)
+- [License](#license)
 
 ## Features
 
-### Matching engine
+### Limit Order Book and Matching Engine
 
-- Limit order book with bid and ask price levels.
-- Price-time priority matching.
-- Order insertion, cancellation, and modification.
-- Partial fills and trade execution.
-- Implemented order types include Good-Till-Cancelled, Fill-and-Kill, Fill-or-Kill, Good-for-Day, and Market orders.
-- Custom order index for order lookup and removal.
-- Preallocated node pool to reduce repeated allocation overhead.
-- Execution reports, trade information, and engine events.
-- Randomized testing and order-book invariant validation.
+- Maintains bid and ask sides with price levels.
+- Supports price-time priority.
+- Supports adding, cancelling, and modifying orders.
+- Handles matching, partial fills, and trade execution.
+- Supports Good-Till-Cancelled (GTC), Fill-and-Kill (FAK), Fill-or-Kill (FOK), Good-for-Day (GFD), and market orders, as implemented by the engine.
+- Produces execution reports, trade information, and engine events.
+- Includes order-book validation and invariant-oriented tests.
+- Uses a custom order index and preallocated node-pool allocation to explore data-structure and allocation trade-offs.
 
-### Market data feed processing
+### Market Data Feed Processing
 
-- Binary protocol decoding with big-endian field handling.
-- Validation of supported message types, lengths, and fields.
-- TCP stream reconstruction for fragmented messages and multiple messages in a stream.
-- Feed-handler integration for orders and cancellations.
-- Nonblocking TCP networking.
-- Linux `epoll` server implementations for level-triggered and edge-triggered configurations.
-- Per-client message-processing counters.
+- Decodes binary protocol messages, including big-endian fields.
+- Validates incoming message fields before processing.
+- Handles new-order and cancel message types.
+- Reconstructs messages from TCP byte streams, including fragmented messages.
+- Separates protocol decoding and stream processing from matching-engine logic.
 
-### Testing and performance analysis
+### Networking
 
-- Unit tests for matching behavior and supported order types.
-- Fill-or-Kill and Fill-and-Kill tests.
-- Randomized order-book testing.
-- Decoder, cancellation, feed-handler, and stream-processor tests.
-- TCP integration testing.
-- Benchmarks for order-book operations, matching latency, decoding, stream processing, order indexes, and allocation strategies.
+- Includes nonblocking TCP server implementations for Linux.
+- Uses `epoll` for socket multiplexing, with level-triggered and edge-triggered variants.
+- Tracks per-client message counters and processing statistics.
+- Keeps network input processing separate from the core matching engine.
+
+### Testing and Performance Analysis
+
+- Unit and integration-oriented test coverage for matching, order types, decoders, stream processing, and feed handling.
+- Randomized order-book invariant testing.
+- Benchmarks for order insertion, cancellation, matching latency, binary decoding, stream processing, indexes, allocation, and event logging.
+- A separate benchmark report documents the recorded environment, methodology, results, and limitations: [`BENCHMARKS.md`](BENCHMARKS.md).
 
 ## Architecture
 
+The high-level processing flow is:
+
 ```text
-                    TCP Client
-                        |
-                        v
-                  Linux TCP Server
-                        |
-                        v
-                    epoll Loop
-                   LT / ET Modes
-                        |
-                        v
-                 Stream Processor
-             TCP Message Reassembly
-                        |
-                        v
-                 Protocol Decoder
-                Validation + Parsing
-                        |
-                        v
-                   Feed Handler
-                        |
-                        v
-                  Matching Engine
-                        |
-                        v
-                  Limit Order Book
-                  /      |      \
-                 v       v       v
-           Price Levels  Index  Node Pool
-                        |
-                        v
-                  Trades and Events
+TCP Client
+    |
+    v
+Nonblocking TCP Server + epoll
+    |
+    v
+TCP Stream Processor
+    |  reconstructs complete protocol messages
+    v
+Binary Protocol Decoder
+    |  validates and decodes fields
+    v
+Feed Handler
+    |
+    v
+Limit Order Book / Matching Engine
+    |
+    +----> Execution Reports
+    |
+    +----> Trades
+    |
+    +----> Engine Events
 ```
 
-### Message-processing flow
+The diagram is conceptual. Exact class and executable names may vary with the current source tree.
 
-1. A client connects to the TCP server.
-2. The server receives data through a nonblocking socket.
-3. The stream processor reconstructs complete protocol messages.
-4. The decoder validates and parses supported messages.
-5. The feed handler forwards valid orders and cancellations.
-6. The matching engine updates the book and executes compatible orders.
-7. The server tracks message-processing statistics.
+## Technology Stack
 
-## Technology stack
+- **Language:** C++20
+- **Build system:** CMake
+- **Compiler used for the recorded benchmarks:** GCC 13.3.0
+- **Networking:** Linux sockets and `epoll`
+- **Testing:** CTest and project test executables
+- **Integration test:** Python 3
+- **Version control:** Git and GitHub
 
-| Technology | Purpose |
-|---|---|
-| C++20 | Matching engine and feed-processing implementation |
-| CMake | Build configuration and test integration |
-| Linux sockets | TCP communication |
-| `epoll` | Event-driven network I/O |
-| C++ STL | Order-book and supporting data structures |
-| Custom order index | Order lookup and removal |
-| Preallocated node pool | Order-book node reuse |
-| Python 3 | TCP integration client and supporting scripts |
-| Docker | Linux development environment on macOS and other platforms |
+## Project Structure
 
-## Project structure
+The repository is organized around the matching engine, protocol/feed-processing components, network servers, tests, and benchmarks. Key areas include:
 
 ```text
 .
 ├── CMakeLists.txt
-├── Dockerfile
 ├── README.md
-├── include/
-│   ├── core/                 # Matching-engine headers
-│   └── feed/                 # Feed-processing headers
-├── src/
-│   ├── core/                 # Matching-engine implementation
-│   ├── feed/                 # Decoder, stream processor, TCP servers
-│   └── main.cpp              # Demo entry point
+├── BENCHMARKS.md
+├── include / headers
+├── source files
 ├── tests/
-│   ├── unit/                 # Matching-engine unit tests
-│   ├── integration/          # TCP integration client
-│   └── ...                   # Feed and decoder tests
-├── benchmarks/               # Performance benchmark programs
-├── docs/                     # Project documentation
-└── scripts/                  # Supporting scripts
+│   └── integration/
+│       └── test_tcp_client.py
+└── benchmark source files
 ```
+
+This is a high-level guide rather than a complete file listing. Use `find . -maxdepth 3 -type f` to inspect the exact layout in your checkout.
 
 ## Requirements
 
-- A C++20-compatible compiler.
-- CMake.
-- Linux for the `epoll`-based TCP servers.
-- Python 3 for the TCP integration client.
-- Docker is recommended when developing on macOS.
+- CMake
+- A C++ compiler with C++20 support (GCC or Clang)
+- Linux for the `epoll` networking components
+- Python 3 for the TCP integration test
+- Git
 
-The `epoll` server uses Linux-specific APIs and must run in a Linux environment.
+The core matching engine may be buildable on other platforms, but the `epoll` server components are Linux-specific.
 
 ## Build
 
-Run the following commands from the project root:
+From the repository root, configure a Release build and compile:
+
+```bash
+cmake -S . -B build/cmake -DCMAKE_BUILD_TYPE=Release
+cmake --build build/cmake -j2
+```
+
+If the project defines the `BUILD_TESTING` and `BUILD_BENCHMARKS` CMake options, they can be enabled explicitly:
 
 ```bash
 cmake -S . -B build/cmake \
@@ -147,145 +146,144 @@ cmake -S . -B build/cmake \
 cmake --build build/cmake -j2
 ```
 
-To configure without benchmark targets:
+If CMake reports that either option is unused, check the option names supported by the current `CMakeLists.txt` rather than assuming those flags take effect.
 
-```bash
-cmake -S . -B build/cmake \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_TESTING=ON \
-  -DBUILD_BENCHMARKS=OFF
+## Run the Tests
 
-cmake --build build/cmake -j2
-```
-
-## Run the tests
+Run the registered tests from the repository root:
 
 ```bash
 ctest --test-dir build/cmake --output-on-failure
 ```
 
-The current configuration registers 8 test suites:
+In the clean-clone verification and a subsequent Release build, **all 8 registered test suites passed**. Results may differ if the code or build configuration changes.
 
-| Test suite | Coverage |
-|---|---|
-| `test_matching` | Matching-engine behavior |
-| `test_order_types` | Supported order-type behavior |
-| `test_fok_levels` | Fill-or-Kill behavior across price levels |
-| `test_randomized` | Randomized operations and book invariants |
-| `test_decoder` | Binary protocol decoding |
-| `test_cancel_decoder` | Cancellation-message decoding |
-| `test_feed_handler` | Feed-handler order and cancellation paths |
-| `test_stream_processor` | TCP stream processing and message reconstruction |
+For a clean verification, clone the repository into a new directory and run the configure, build, and test commands above.
 
-**Latest recorded validation:** 8/8 tests passed.
+## Run the TCP Server
 
-Rebuild after code changes before rerunning CTest.
-
-## Run the TCP server
-
-Build the project first. Find the generated server executables:
+The TCP server uses port **9000** in the current implementation. First, build the project and identify the server executable produced by CMake:
 
 ```bash
-find build/cmake -type f \
-  \( -name 'epoll_feed_server_lt' -o -name 'epoll_feed_server_et' \) \
-  -executable -print
+find build -type f -executable
 ```
 
-Start the level-triggered server using the path printed by the command. For example, if it is located under `build/cmake/bin`:
+Then run the appropriate server executable shown by your build. For example, if your build places it in `build/cmake/bin/`, inspect the available files there:
 
 ```bash
-./build/cmake/bin/epoll_feed_server_lt
+find build/cmake/bin -maxdepth 1 -type f -executable -print
 ```
 
-Or start the edge-triggered server:
+Choose the executable corresponding to the TCP server implementation you want to test. The exact executable name depends on the current CMake target configuration.
 
-```bash
-./build/cmake/bin/epoll_feed_server_et
+## TCP Integration Test
+
+The Python integration client is located at:
+
+```text
+tests/integration/test_tcp_client.py
 ```
 
-Use the actual paths reported by `find` if your CMake configuration places executables elsewhere.
-
-The server listens on TCP port `9000`, as configured by the implementation. Stop it with `Ctrl+C`.
-
-## TCP integration test
-
-With the server running, open a second terminal in the same Linux environment and run:
+Start the TCP server in one terminal, then run the client from the repository root in another terminal:
 
 ```bash
 python3 tests/integration/test_tcp_client.py
 ```
 
-The integration scenario sends a new-order message in fragments and then sends a cancellation message.
+The client must be compatible with the server's binary message format. A representative successful run reported:
 
-In the tested scenario, both level-triggered and edge-triggered configurations processed the messages successfully.
+- Bytes received: `40`
+- Messages processed: `2`
+- Messages rejected: `0`
 
-Representative observed server counters:
-
-```text
-Bytes received:       40
-Messages processed:    2
-Messages rejected:     0
-```
-
-These counters describe the tested scenario, not maximum throughput. The integration client introduces delays between writes.
+These are example results from a test run, not guaranteed output for every client payload or source revision.
 
 ## Benchmarks
 
-The `benchmarks/` directory contains benchmark programs for areas including:
+Benchmarks are useful for comparing implementations and detecting regressions, but the figures below are **preliminary measurements from two Release runs in a containerized Linux ARM64 environment**. They are not production performance guarantees.
 
-- Order insertion and cancellation.
-- Matching operations and latency.
-- Binary message decoding.
-- Feed and stream processing.
-- Order-index implementations.
-- Allocation and node-pool strategies.
-- Event logging.
+### Recorded Results
 
-Build benchmark targets with:
+| Benchmark | Run 1 | Run 2 |
+|---|---:|---:|
+| Order insertion throughput | 9.41 million orders/sec | 5.53 million orders/sec |
+| Cancellation throughput | 26.57 million cancels/sec | 24.93 million cancels/sec |
+| Matching latency, p50 | 84 ns | 83 ns |
+| Matching latency, p99 | 375 ns | 291 ns |
+| New-order decoder throughput | 105.17 million messages/sec | 85.76 million messages/sec |
+| Cancel decoder throughput | 199.63 million messages/sec | 172.03 million messages/sec |
+| Stream processor: separate calls | 17.45 million messages/sec | 17.10 million messages/sec |
+| Stream processor: order and cancel in same buffer | 23.77 million messages/sec | 24.09 million messages/sec |
+| Stream processor: fragmented order | 21.28 million messages/sec | 21.62 million messages/sec |
+
+### Benchmark Environment
+
+The recorded runs used:
+
+- Linux kernel `6.12.76-linuxkit`
+- ARM64 (`aarch64`) container environment
+- GCC `13.3.0`
+- CMake Release build with `-O3 -DNDEBUG`
+- 100,000 orders for insertion, cancellation, and matching-latency tests
+- 1,000,000 iterations/messages for decoder and stream-processor tests
+
+The environment reported an Apple CPU vendor in the container, but the exact host CPU model was not established. The results should therefore be treated as measurements of this specific environment, not as a precise hardware characterization.
+
+### How to Reproduce
+
+Configure and build in Release mode:
 
 ```bash
-cmake -S . -B build/cmake \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_TESTING=ON \
-  -DBUILD_BENCHMARKS=ON
-
+cmake -S . -B build/cmake -DCMAKE_BUILD_TYPE=Release
 cmake --build build/cmake -j2
 ```
 
-Inspect available benchmark executables:
+Inspect the benchmark executables produced by the build:
 
 ```bash
-find build/cmake -type f -executable -iname '*benchmark*' -print
+find build -type f -executable
 ```
 
-Run a benchmark using the executable path and options supported by that benchmark. Review its source before interpreting results.
+Run the relevant benchmark executables from the paths shown by that command. Benchmark target names and output paths depend on the CMake configuration; do not assume a target exists unless it appears in your build.
 
-### Benchmarking considerations
+For the full recorded results, environment details, methodology, and caveats, see [`BENCHMARKS.md`](BENCHMARKS.md).
 
-Measurements depend on hardware, compiler, optimization settings, workload, and measurement methodology. Single-run measurements should be treated as preliminary observations rather than statistically robust performance claims.
+### How to Interpret These Numbers
 
-For meaningful comparisons, record hardware, compiler version, build flags, workload, number of trials, and latency percentiles where applicable. Compare results only when test conditions are equivalent.
+- Insertion throughput varied noticeably between the two runs.
+- The matching-latency benchmark reported a minimum of `0 ns` in these runs. This is not evidence that matching takes no time; it reflects limitations of measuring very short operations with a nanosecond-resolution timer and should not be presented as a meaningful latency figure.
+- The matching benchmark includes timing overhead. The p50 and p99 values are more useful for understanding the recorded distribution than the reported minimum, but they are still environment- and workload-dependent.
+- Decoder and stream-processor microbenchmarks measure in-process work. They are **not end-to-end TCP throughput** and do not include the full cost of a live network connection.
+- For credible performance comparisons, repeat runs under controlled conditions, record the hardware and compiler settings, and compare equivalent workloads.
 
-## Design considerations and limitations
+## Correctness and Performance Notes
 
-This project focuses on matching-engine fundamentals, data structures, protocol decoding, stream processing, and event-driven networking.
+- The project has a clean-clone build and test verification recorded in its development notes.
+- The latest recorded CTest result was **8/8 tests passed**.
+- Benchmark figures are reported with their workload and environment so they are not mistaken for universal guarantees.
+- Passing tests and strong microbenchmark numbers do not establish production readiness for real-money trading.
 
-It does not claim production readiness or exchange-grade performance.
+## Limitations
 
-A production trading system would require additional engineering, including:
+- This is an educational project and has not been validated for production trading.
+- Benchmark results depend on compiler, CPU, operating system, build flags, workload, and runtime conditions.
+- The recorded results are preliminary and based on two runs, not a statistically rigorous benchmark campaign.
+- The TCP protocol is a project-specific binary protocol and should not be assumed to match any exchange's production protocol.
+- Linux `epoll` networking components are platform-specific.
+- Further work is needed for robust operational controls, stress testing, fault handling, observability, and production-grade protocol/security review.
 
-- A clearly specified and versioned wire protocol.
-- Comprehensive malformed-input and protocol fuzz testing.
-- Explicit concurrency and ownership guarantees.
-- Persistence, recovery, and replay guarantees.
-- Risk controls and operational monitoring.
-- More extensive failure-injection and multi-client stress testing.
-- Reproducible end-to-end latency and throughput measurements.
+## Future Improvements
 
-## Future improvements
+Potential next steps include:
 
-Potential next steps include protocol fuzzing, sanitizer-enabled builds, deterministic message replay, automated benchmark comparisons, and expanded multi-client testing.
+- Add repeatable benchmark automation and report median and percentile results across many runs.
+- Add more adversarial and property-based tests for order-book invariants and malformed protocol messages.
+- Add backpressure handling and more extensive TCP disconnect/reconnect tests.
+- Improve benchmark reproducibility by documenting the exact CPU model, compiler flags, and runtime conditions.
+- Evaluate cache locality and data-structure alternatives using profiling before making optimization claims.
+- Add continuous integration for builds and tests on supported platforms.
+- Document protocol message layouts and the matching rules in more detail.
 
 ## License
 
-No open-source license has been selected yet. Until a license is added, do not assume that the repository is released under a permissive open-source license.
+No open-source license has been selected for this repository yet. Until a license is added, do not assume that the code is available for unrestricted reuse, modification, or redistribution.
