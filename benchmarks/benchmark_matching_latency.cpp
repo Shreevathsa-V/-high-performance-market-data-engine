@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <iomanip>
 #include <iostream>
 #include <memory>
@@ -100,6 +101,49 @@ std::uint64_t MeasureTimerOverhead()
 int main()
 {
     constexpr std::size_t ORDER_COUNT = 100'000;
+    constexpr std::size_t WARMUP_COUNT = 10'000;
+
+    // ---------------------------------------------------------
+    // Warm up the matching engine.
+    //
+    // Use a separate order book so these operations do not
+    // affect the measured benchmark.
+    // ---------------------------------------------------------
+
+    {
+        OrderBook warmupBook;
+
+        for (std::size_t i = 0; i < WARMUP_COUNT; ++i)
+        {
+            auto sellOrder = std::make_shared<Order>(
+                OrderType::GoodTillCancel,
+                static_cast<OrderId>(i + 1),
+                Side::Sell,
+                10000,
+                100);
+
+            warmupBook.AddOrder(sellOrder);
+        }
+
+        for (std::size_t i = 0; i < WARMUP_COUNT; ++i)
+        {
+            auto buyOrder = std::make_shared<Order>(
+                OrderType::GoodTillCancel,
+                static_cast<OrderId>(WARMUP_COUNT + i + 1),
+                Side::Buy,
+                10100,
+                100);
+
+            warmupBook.AddOrder(buyOrder);
+        }
+
+        if (!warmupBook.ValidateBook() ||
+            warmupBook.Size() != 0)
+        {
+            std::cerr << "ERROR: Warm-up order-book validation failed.\n";
+            return EXIT_FAILURE;
+        }
+    }
 
     // ---------------------------------------------------------
     // Create the order book.
@@ -233,10 +277,21 @@ int main()
         << orderBook.Size()
         << '\n';
 
+    const bool bookValid = orderBook.ValidateBook();
+
     std::cout
         << "Final book valid: "
-        << orderBook.ValidateBook()
+        << std::boolalpha
+        << bookValid
         << "\n\n";
+
+    if (!bookValid)
+    {
+        std::cerr
+            << "ERROR: Order-book validation failed after matching.\n";
+
+        return EXIT_FAILURE;
+    }
 
 
     // ---------------------------------------------------------
@@ -286,7 +341,8 @@ int main()
         << std::setprecision(2);
 
     std::cout
-        << "Matching latency distribution\n";
+        << "Matching latency distribution "
+        << "(includes clock-call overhead)\n";
 
     std::cout
         << "--------------------------------\n";
