@@ -203,6 +203,12 @@ if(BUILD_BENCHMARKS)
         benchmarks/benchmark_matching_latency.cpp
     )
 
+    # Compare matching performance across price-level layouts.
+    add_project_benchmark(
+        benchmark_price_levels
+        benchmarks/benchmark_price_levels.cpp
+    )
+
     # Feed-pipeline latency benchmark.
     add_project_benchmark(
         benchmark_feed_latency

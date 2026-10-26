@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <functional>
 #include <map>
 #include <memory>
@@ -29,9 +30,9 @@ private:
     std::map<Price, PriceLevel, std::less<Price>> asks_;
 
     // Fast lookup by OrderId.
-    OrderIndex orderIndex_{100'000, 262'144};
+    OrderIndex orderIndex_;
 
-    OrderNodePool orderNodePool_{100'000};
+    OrderNodePool orderNodePool_;
 
     //Event 
     std::uint64_t nextSequenceNumber_{1};
@@ -53,8 +54,14 @@ private:
     void RecordEvent(EventType type, OrderId orderId, Price price, Quantity quantity);
 
 public:
-    explicit OrderBook(bool eventLoggingEnabled = true)
-        : eventLoggingEnabled_{eventLoggingEnabled}
+    explicit OrderBook(
+        bool eventLoggingEnabled = true,
+        std::size_t orderPoolCapacity = 100'000,
+        std::size_t orderIndexCapacity = 100'000,
+        std::size_t orderIndexBucketCount = 262'144)
+        : orderIndex_{orderIndexCapacity, orderIndexBucketCount}
+        , orderNodePool_{orderPoolCapacity}
+        , eventLoggingEnabled_{eventLoggingEnabled}
     {
     }
 
