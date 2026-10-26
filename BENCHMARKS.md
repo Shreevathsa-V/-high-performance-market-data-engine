@@ -84,25 +84,51 @@ These results describe the cancellation benchmark's workload. They do not repres
 
 ## 3. Matching Latency
 
-The benchmark prepared 100,000 resting sell orders and 100,000 incoming buy orders before measuring the matching operations. It recorded one latency sample per incoming order and measured batch duration separately.
+The matching-latency benchmark measures the time required to process incoming orders against an order book containing resting orders.
 
-| Metric | Run 1 | Run 2 |
-|---|---:|---:|
-| Samples | 100,000 | 100,000 |
-| Average measured latency | 146.23 ns | 134.75 ns |
-| p50 | 84 ns | 83 ns |
-| p90 | 208 ns | 167 ns |
-| p99 | 375 ns | 291 ns |
-| p99.9 | 4.04 us | 3.29 us |
-| Maximum observed latency | 2.13 ms | 2.49 ms |
-| Final book size | 0 | 0 |
-| Book validation | Passed | Passed |
+### Workload and methodology
 
-The benchmark uses `std::chrono::steady_clock`. Each operation is timed individually, so the measured interval includes timing-call overhead.
+- Prepared 100,000 resting sell orders before measurement.
+- Used 100,000 incoming buy orders, each priced to cross the resting sell orders.
+- Executed 10,000 warm-up matches using a separate order book.
+- Created a fresh order book for the measured workload.
+- Recorded one latency sample per matching operation using `std::chrono::steady_clock`.
+- Measured total batch duration separately to estimate throughput.
+- Validated the order book before and after the measured workload.
 
-The reported minimum was 0 ns in both runs. Because elapsed durations are converted to integer nanoseconds, a zero result may reflect timer granularity or duration truncation. It is not presented as a meaningful zero-latency result.
+The warm-up operations are excluded from the 100,000 measured latency samples. Each measured interval includes clock-call overhead.
 
-The p99 and p99.9 figures are observations from these runs, not latency guarantees. The maximum values demonstrate that occasional long delays occurred in this environment.
+| Metric | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 |
+|---|---:|---:|---:|---:|---:|
+| Matching operations | 100,000 | 100,000 | 100,000 | 100,000 | 100,000 |
+| Average measured latency | 233.55 ns | 171.24 ns | 162.75 ns | 155.16 ns | 157.12 ns |
+| p50 latency | 125 ns | 125 ns | 125 ns | 125 ns | 125 ns |
+| p90 latency | 333 ns | 208 ns | 167 ns | 167 ns | 167 ns |
+| p99 latency | 542 ns | 292 ns | 292 ns | 292 ns | 291 ns |
+| p99.9 latency | 1.25 us | 4.875 us | 0.834 us | 0.958 us | 0.792 us |
+| Maximum observed latency | 5.00 ms | 1.46 ms | 1.77 ms | 1.33 ms | 1.27 ms |
+| Approximate throughput | 3.70 million ops/sec | 4.82 million ops/sec | 5.07 million ops/sec | 5.23 million ops/sec | 5.23 million ops/sec |
+| Final book size | 0 | 0 | 0 | 0 | 0 |
+| Book validation | Passed | Passed | Passed | Passed | Passed |
+
+These results are preliminary measurements from the documented container environment, not guarantees of performance on other hardware.
+
+### Interpretation
+
+The observed median latency was 125 ns in all five runs. The p99 latency ranged from 291 ns to 542 ns, while approximate throughput ranged from 3.70 million to 5.23 million matching operations per second.
+
+The maximum observed latency ranged from approximately 1.27 ms to 5.00 ms. Such long outliers can disproportionately affect average latency and may reflect operating-system scheduling or other environmental interference. These measurements alone cannot identify the cause.
+
+The results show that the median was stable across these trials, but tail latency and throughput varied. Five runs are insufficient to establish a reliable performance distribution or a production latency guarantee.
+
+### Measurement limitations
+
+- Individual measurements include clock-call overhead, which is significant relative to nanosecond-scale operations.
+- The estimated clock overhead is informational only and is not subtracted from samples.
+- The workload measures in-process matching operations, not network-to-network latency.
+- The reported throughput is measured separately over the batch and should not be inferred from the median latency.
+- The benchmark runs in a container without independently verified host CPU frequency or physical resource isolation.
+- Results should not be compared directly with other implementations unless hardware, compiler, workload, and measurement methodology are comparable.
 
 ## 4. Binary Protocol Decoder
 
