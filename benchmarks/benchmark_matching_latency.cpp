@@ -345,5 +345,7 @@ int main()
 
     const double throughput = totalSeconds > 0.0 ? static_cast<double>(ORDER_COUNT) / totalSeconds : 0.0;
 
+    std::cout << "Approximate throughput: " << std::fixed << std::setprecision(2) << throughput << " orders/sec\n";
+
     return 0;
 }
