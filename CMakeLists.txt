@@ -203,6 +203,11 @@ if(BUILD_BENCHMARKS)
         benchmarks/benchmark_matching_latency.cpp
     )
 
+    add_project_benchmark(
+        profile_matching
+        benchmarks/profile_matching.cpp
+    )
+
     # Compare matching performance across price-level layouts.
     add_project_benchmark(
         benchmark_price_levels
