@@ -162,19 +162,35 @@ For a clean verification, clone the repository into a new directory and run the 
 
 ## Run the TCP Server
 
-The TCP server uses port **9000** in the current implementation. First, build the project and identify the server executable produced by CMake:
+The Linux TCP servers listen on port **9000**. Build the project first:
 
 ```bash
-find build -type f -executable
+cmake -S . -B build/cmake \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_TESTING=ON \
+  -DBUILD_BENCHMARKS=ON
+cmake --build build/cmake --parallel 2
 ```
 
-Then run the appropriate server executable shown by your build. For example, if your build places it in `build/cmake/bin/`, inspect the available files there:
+Run one server at a time. The level-triggered and edge-triggered implementations are separate executables:
 
 ```bash
-find build/cmake/bin -maxdepth 1 -type f -executable -print
+./build/bin/epoll_feed_server_lt
 ```
 
-Choose the executable corresponding to the TCP server implementation you want to test. The exact executable name depends on the current CMake target configuration.
+Or:
+
+```bash
+./build/bin/epoll_feed_server_et
+```
+
+The ordinary TCP server is available as:
+
+```bash
+./build/bin/tcp_feed_server
+```
+
+Stop the selected server with Ctrl+C before starting another server on the same port.
 
 ## TCP Integration Test
 

@@ -219,3 +219,53 @@ Run the automated tests:
 ```bash
 ctest --test-dir build/cmake --output-on-failure
 ```
+
+## 6. Concurrent TCP `epoll` Benchmark
+
+The repository includes a concurrent TCP benchmark that compares the level-triggered and edge-triggered `epoll` servers. It uses four clients, with each client sending 2,500 new-order/cancel pairs per iteration.
+
+Each measured iteration expects:
+- 20,000 messages across all clients
+- 400,000 bytes received
+- 5,000 messages and 100,000 bytes per client
+- Zero rejected messages
+
+The benchmark checks server-reported message and byte counts before recording an iteration as successful.
+
+### Recorded results
+
+The existing CSV files report the following summary for ten measured iterations per mode:
+
+| Metric | Level-triggered | Edge-triggered |
+|---|---:|---:|
+| Median throughput | 2,640,946 messages/sec | 2,945,233 messages/sec |
+| Mean throughput | 2,519,787 messages/sec | 2,774,826 messages/sec |
+| Minimum throughput | 1,767,123 messages/sec | 220,600 messages/sec |
+| Maximum throughput | 3,028,162 messages/sec | 4,681,603 messages/sec |
+| Standard deviation | 459,185 messages/sec | 1,194,360 messages/sec |
+
+Edge-triggered mode had 11.52% higher median throughput in these recorded runs. Its substantially higher standard deviation and lower minimum show that results varied considerably between iterations. These observations do not establish a universal performance advantage.
+
+### Reproducing the benchmark
+
+Start the selected server with its output redirected to the log expected by the benchmark. For example, in one terminal:
+
+```bash
+./build/bin/epoll_feed_server_lt > server_benchmark.log 2>&1
+```
+
+In a second terminal, from the repository root, run:
+
+```bash
+python3 benchmarks/benchmark_tcp_verified.py --mode lt
+```
+
+For edge-triggered mode, stop the first server, start `./build/bin/epoll_feed_server_et` with output redirected to `server_benchmark.log`, and run:
+
+```bash
+python3 benchmarks/benchmark_tcp_verified.py --mode et
+```
+
+**Warning:** The script overwrites `benchmark_results/epoll_lt.csv` or `benchmark_results/epoll_et.csv` for the selected mode. Back up any results you want to preserve before rerunning it. Use a fresh server log for each benchmark session so old result records cannot be mistaken for current results.
+
+The benchmark measures concurrent client submission and server processing within this test setup. It is not a measurement of exchange-grade latency, kernel-bypass networking, or production trading performance. Results depend on the container, host load, scheduling, compiler, and workload.
